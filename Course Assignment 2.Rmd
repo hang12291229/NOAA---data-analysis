@@ -1,0 +1,127 @@
+---
+title: " U.S. National Oceanic and Atmospheric Administration's (NOAA) - Data analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data processing
+
+First is to read the data from the file
+```{r readdata}
+# Load the data
+setwd ("C:/Users/PakHang/Desktop/Coursera JHU/Chapter 5/Data")
+StormData <- read.csv("StormData.csv.bz2")
+
+#To start with, we will go through the data 
+dim (StormData)
+head (StormData, 10)
+```
+In the data, we can find that there are 692288 observations and 37 variables. However, most hte variable are not relevant to this data analysis topic, so we have to subset the data with the relevant data i.e EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP,CROPDMG, CROPDMGEXP
+
+```{r subsetdata}
+stormdatav2<- StormData[c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP","CROPDMG", "CROPDMGEXP")]
+```
+
+## Convert the variables 
+In the data set, some of the data is not appropriate. Therfore we have to clean up the data before computing.
+
+1.Change the number of fatalities and injuries from factor variables to numeric variables
+```{r changenumbers}
+stormdatav2$FATALITIES <- as.numeric(stormdatav2$FATALITIES)
+stormdatav2$INJURIES <- as.numeric(stormdatav2$INJURIES)
+stormdatav2$PROPDMG <- as.numeric(stormdatav2$PROPDMG)
+stormdatav2$CROPDMG <- as.numeric(stormdatav2$CROPDMG)
+```
+
+2.The Property damange and Compr damange are presented as a form of base and the unit (K= 1000, M= 1,000,000, B = 1,000,000,000,0). Hence we need to 1.Convert the unit in column with PROPDMGEXP and CROPDMGEXP to number and multiply the numerical value by the unit 
+```{r set new variables}
+#Set a new column to store the numerical value of the unit
+stormdatav2["PROPLOSSUNIT"] <- 1
+stormdatav2["PROPLOSSVALUE"] <- 1
+stormdatav2["CROPLOSSUNIT"] <- 1
+stormdatav2["CROPLOSSVALUE"] <- 1
+
+#Convert the units for property damages into integer, and calculate the total loss
+if (stormdatav2$PROPDMGEXP == "k " || stormdatav2$PROPDMGEXP == "K") {
+   stormdatav2$PROPLOSSUNIT <- 1000
+   } else if  (stormdatav2$PROPDMGEXP == "m" || stormdatav2$PROPDMGEXP == "M" ) {
+   stormdatav2$PROPLOSSUNIT <- 1000000
+   } else if (stormdatav2$PROPDMGEXP == "b"  || stormdatav2$PROPDMGEXP == "B" ) {
+   stormdatav2$PROPLOSSUNIT <- 1000000000
+   } else {
+   stormdatav2$PROPLOSSUNIT <- 1 
+   }
+
+stormdatav2["PROPLOSSVALUE"] <- stormdatav2$PROPLOSSUNIT*stormdatav2$PROPDMG
+
+#Convert the units for crop damages into integer, and calculate the total loss
+if (stormdatav2$CROPDMGEXP == "k " || stormdatav2$CROPDMGEXP == "K") {
+   stormdatav2$CROPLOSSUNIT <- 1000
+   } else if  (stormdatav2$CROPDMGEXP == "m" || stormdatav2$CROPDMGEXP == "M" ) {
+   stormdatav2$PROPLOSSUNIT <- 1000000
+   } else if (stormdatav2$CROPDMGEXP == "b"  || stormdatav2$CROPDMGEXP == "B" ) {
+   stormdatav2$CROPLOSSUNIT <- 1000000000
+   } else {
+   stormdatav2$CROPLOSSUNIT <- 1 
+   }
+stormdatav2["CROPLOSSVALUE"] <- stormdatav2$CROPLOSSUNIT*stormdatav2$CROPDMG
+```
+
+## Compute the personal health statistics
+We can use the aggregate function to get the sum of fatalities and injuries in different hazards
+```{r aggregate}
+stormfatal <- aggregate(FATALITIES ~ EVTYPE, stormdatav2, FUN = sum)
+storminj <- aggregate(INJURIES ~ EVTYPE, stormdatav2, FUN = sum)
+```
+Then we can take a look for the disasters which cause the greatest no.of fatalities 
+```{r fatalities}
+# Rank the natural hazards according to no.of fatalities (From most to least)
+moststormfatal = stormfatal[order(-stormfatal$FATALITIES), ] 
+# Take 10 natural hazards which cause the most no.of fatalities 
+fataldisaster <- head(moststormfatal, 10)
+# Generate the plot to illustrate the statistics
+barplot(fataldisaster$FATALITIES, las=3, names.arg = fataldisaster$EVTYPE, main = "Disaster with highest no.of death", ylab = "No.of deaths", col=topo.colors(10))
+```
+
+Besides fatalities, the no.of injuries are as follows:
+```{r injuries}
+# Rank the natural hazards according to no.of injuries (From most to least)
+moststorminj = storminj[order(-storminj$INJURIES), ]
+# Take 10 natural hazards which cause the most no.of injuries
+injdisaster <- head(moststorminj, 10)
+# Generate the plot to illustrate the statistics
+barplot(injdisaster$INJURIES, las=3, names.arg = injdisaster$EVTYPE, main = "Disaster with highest no.of injuries", ylab = "No.of injuries", col=topo.colors(10))
+```
+
+With the statistics, we can see that the STM Wind caused the largest number of death among all the natural hazards.
+
+## Compute the Economical loss
+We can use the aggregate function to get the sum of property loss and crop loss in different hazards
+```{r proplossaggregate}
+propdamage <- aggregate(PROPLOSSVALUE ~ EVTYPE, stormdatav2, FUN = sum)
+cropdamage <- aggregate(CROPLOSSVALUE ~ EVTYPE, stormdatav2, FUN = sum)
+```
+Then we can take a look for the disasters which cause the greatest no.of property loss
+```{r proploss}
+# Rank the natural hazards according to no.of property loss (From most to least)
+propdamage = propdamage[order(-propdamage$PROPLOSSVALUE), ] 
+# Take 4 natural hazards which cause the most no.of property loss
+toppropdamage <- head(propdamage, 4)
+# Generate the plot to illustrate the statistics
+barplot(toppropdamage$PROPLOSSVALUE/10^6, las = 3, names.arg = toppropdamage$EVTYPE,main = "Disaster with highest property loss", ylab = "Loss in Million", col=topo.colors(4))
+```
+
+Besides fatalities, the no.of injuries are as follows:
+```{r croploss}
+# Rank the natural hazards according to no.of crop loss (From most to least)
+cropdamage = cropdamage[order(-cropdamage$CROPLOSSVALUE), ] 
+# Take 4 natural hazards which cause the most no.of crop loss
+topcropdamage <- head(cropdamage, 4)
+# Generate the plot to illustrate the statistics
+barplot(topcropdamage$CROPLOSSVALUE/10^6, las = 3, names.arg = topcropdamage$EVTYPE, main = "Disaster with highest crop loss", ylab = "Loss in Million", col=topo.colors(4))
+```
+
+With the statistics, we can see that the STM Wind also caused the greatest economic loss among all the natural hazards.Therefore we can colclude that STM wind cause the most personal and economical damage.
